@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS) }}
     timeout-minutes: 30
 
     permissions:
@@ -50,20 +50,24 @@ jobs:
       - name: Resolve release metadata
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "RELEASE_KIND=release" >> $GITHUB_ENV
-            echo "RELEASE_CHANNEL=latest" >> $GITHUB_ENV
+            {
+              echo "RELEASE_KIND=release"
+              echo "RELEASE_CHANNEL=latest"
+            } >> "$GITHUB_ENV"
           else
             sha_short=$(git rev-parse --short HEAD)
 
-            echo "RELEASE_KIND=insiders" >> $GITHUB_ENV
-            echo "RELEASE_CHANNEL=insiders" >> $GITHUB_ENV
-            echo "SHA_SHORT=$sha_short" >> $GITHUB_ENV
-            echo "INSIDERS_VERSION=0.0.0-insiders.$sha_short" >> $GITHUB_ENV
+            {
+              echo "RELEASE_KIND=insiders"
+              echo "RELEASE_CHANNEL=insiders"
+              echo "SHA_SHORT=$sha_short"
+              echo "INSIDERS_VERSION=0.0.0-insiders.$sha_short"
+            } >> "$GITHUB_ENV"
           fi
 
       - name: 'Version packages based on commit: ${{ env.INSIDERS_VERSION }}'
         if: env.RELEASE_KIND == 'insiders'
-        run: pnpm run version-packages ${INSIDERS_VERSION}
+        run: pnpm run version-packages "${INSIDERS_VERSION}"
 
       # The marketplace does not support insiders versions, so the extension is
       # bumped to the next pre-release version instead
@@ -74,21 +78,21 @@ jobs:
           cat packages/vscode-tailwindcss/package.json
 
       - name: Publish to npm
-        run: >
-          pnpm --recursive --filter='!vscode-tailwindcss' publish --tag ${RELEASE_CHANNEL} --access public --no-git-checks
+        run: |
+          pnpm --recursive --filter='!vscode-tailwindcss' publish --tag "${RELEASE_CHANNEL}" --access public --no-git-checks
 
       - name: Publish IntelliSense (pre-release)
         if: env.RELEASE_KIND == 'insiders'
         env:
           VSCODE_TOKEN: ${{ secrets.VSCODE_TOKEN }}
-        run: >
-          cd packages/vscode-tailwindcss &&
-          pnpm run publish --pre-release -p $VSCODE_TOKEN
+        run: |
+          cd packages/vscode-tailwindcss
+          pnpm run publish --pre-release -p "$VSCODE_TOKEN"
 
       - name: Publish IntelliSense
         if: env.RELEASE_KIND == 'release'
         env:
           VSCODE_TOKEN: ${{ secrets.VSCODE_TOKEN }}
-        run: >
-          cd packages/vscode-tailwindcss &&
-          pnpm run publish -p $VSCODE_TOKEN
+        run: |
+          cd packages/vscode-tailwindcss
+          pnpm run publish -p "$VSCODE_TOKEN"
