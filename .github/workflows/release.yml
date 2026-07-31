@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    tags: ['v*.*.*']
   release:
     types: [published]
 
@@ -49,7 +49,7 @@ jobs:
       # insiders and releases must be published from this workflow.
       - name: Resolve release metadata
         run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
+          if [[ "${{ github.event_name }}" == "release" || "${{ github.ref_type }}" == "tag" ]]; then
             {
               echo "RELEASE_KIND=release"
               echo "RELEASE_CHANNEL=latest"
