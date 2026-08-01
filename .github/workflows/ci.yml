@@ -1,44 +1,20 @@
-name: Run Tests
+name: Nix CI
+
 on:
   push:
     branches:
       - monarchic
+  merge_group:
   workflow_dispatch:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
-  tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [18, 20, 22, 24]
-
-    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS) }}
-    name: Run Tests - Node v${{ matrix.node }}
-
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          cache: 'pnpm'
-          node-version: ${{ matrix.node }}
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Run syntax tests
-        working-directory: packages/tailwindcss-language-syntax
-        run: pnpm run build && pnpm run test
-
-      - name: Run service tests
-        working-directory: packages/tailwindcss-language-service
-        run: pnpm run build && pnpm run test
-
-      - name: Run server tests
-        working-directory: packages/tailwindcss-language-server
-        run: pnpm run build && pnpm run test
+  nix-ci:
+    uses: monarchic-langs/.github/.github/workflows/nix-ci.yml@main
+    with:
+      publish_cache: ${{ github.ref == 'refs/heads/monarchic' }}
+    secrets:
+      MONARCHIC_GITHUB_PAT: ${{ secrets.MONARCHIC_GITHUB_PAT }}

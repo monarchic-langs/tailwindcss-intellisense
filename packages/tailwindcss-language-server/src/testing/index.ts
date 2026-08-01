@@ -153,6 +153,10 @@ async function installDependencies(base: string, storage: Storage) {
 async function installDependenciesIn(dir: string) {
   console.log(`Installing dependencies in ${dir}`)
 
+  if (await installNixDependencies(dir)) {
+    return
+  }
+
   await new Promise((resolve, reject) => {
     proc.exec('npm install --package-lock=false', { cwd: dir }, (err, res) => {
       if (err) {
@@ -162,6 +166,58 @@ async function installDependenciesIn(dir: string) {
       }
     })
   })
+}
+
+async function installNixDependencies(dir: string): Promise<boolean> {
+  let packageJsonPath = path.join(dir, 'package.json')
+  let packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'))
+  let dependencies = packageJson.dependencies ?? {}
+
+  let nodeModulesSource: string | undefined
+
+  if (dependencies.tailwindcss === '4.1.18') {
+    nodeModulesSource = process.env.TAILWINDCSS_INTELLISENSE_NIX_TW_4_1_18_NODE_MODULES
+  } else if (dependencies.tailwindcss === '4.1.0' && dependencies['@tailwindcss/oxide'] === '4.1.0') {
+    nodeModulesSource = process.env.TAILWINDCSS_INTELLISENSE_NIX_TW_4_1_0_OXIDE_NODE_MODULES
+  } else if (dependencies.tailwindcss === '4.1.0') {
+    nodeModulesSource = process.env.TAILWINDCSS_INTELLISENSE_NIX_TW_4_1_0_NODE_MODULES
+  } else if (dependencies.tailwindcss === '4.3.3') {
+    nodeModulesSource = process.env.TAILWINDCSS_INTELLISENSE_NIX_TW_4_3_3_NODE_MODULES
+  } else if (dependencies.tailwindcss === '3.4.18') {
+    nodeModulesSource = process.env.TAILWINDCSS_INTELLISENSE_NIX_TW_3_4_18_NODE_MODULES
+  }
+
+  if (!nodeModulesSource) {
+    return false
+  }
+
+  await fs.cp(nodeModulesSource, path.join(dir, 'node_modules'), { recursive: true })
+  await makeWritable(path.join(dir, 'node_modules'))
+
+  for (let [name, spec] of Object.entries<string>(dependencies)) {
+    if (!spec.startsWith('file:')) continue
+
+    let dependencyPath = path.join(dir, 'node_modules', name)
+    await fs.mkdir(path.dirname(dependencyPath), { recursive: true })
+    await fs.rm(dependencyPath, { force: true, recursive: true })
+    await fs.symlink(path.resolve(dir, spec.slice('file:'.length)), dependencyPath, 'dir')
+  }
+
+  return true
+}
+
+async function makeWritable(filepath: string) {
+  let stat = await fs.lstat(filepath)
+
+  if (!stat.isSymbolicLink()) {
+    await fs.chmod(filepath, stat.mode | 0o200)
+  }
+
+  if (!stat.isDirectory()) return
+
+  for (let entry of await fs.readdir(filepath)) {
+    await makeWritable(path.join(filepath, entry))
+  }
 }
 
 export const css: Dedent = dedent

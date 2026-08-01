@@ -8,6 +8,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const root = path.resolve(__dirname, '..')
 
+if (process.env.TAILWINDCSS_INTELLISENSE_SKIP_FIXTURE_INSTALL === '1') {
+  console.log('Skipping fixture dependency installation')
+  process.exit(0)
+}
+
 const fixtures = await glob({
   cwd: root,
   patterns: ['tests/fixtures/*/package.json', 'tests/fixtures/v4/*/package.json'],
